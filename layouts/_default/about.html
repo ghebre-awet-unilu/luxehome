@@ -1,0 +1,50 @@
+{{ define "main" }}
+
+<section class="page-hero page-hero-sm">
+  <div class="container">
+    <h1 class="page-title">{{ .Title }}</h1>
+    {{ with .Description }}<p class="page-sub">{{ . }}</p>{{ end }}
+  </div>
+</section>
+
+<section class="section">
+  <div class="container content-page">
+    {{ .Content }}
+  </div>
+</section>
+
+<section class="section team-section">
+  <div class="container">
+    <div class="section-header">
+      <p class="section-eyebrow">The people behind LuxeHome</p>
+      <h2 class="section-title">Meet Our Team</h2>
+    </div>
+    <div class="team-grid">
+
+      <div class="team-card">
+        <div class="team-photo-wrap">
+          <img src="{{ (.Params.officer_image | default "images/team-head-officer.svg") | strings.TrimPrefix "/" | absURL }}" alt="{{ .Params.officer_name | default "Head Officer" }}" class="team-photo">
+        </div>
+        <div class="team-info">
+          <h3 class="team-name">{{ .Params.officer_name | default "Head Officer" }}</h3>
+          <p class="team-role">Head Officer</p>
+          <p class="team-bio">{{ .Params.officer_bio | default "Leading LuxeHome's vision and strategy, ensuring every client receives the highest standard of service across Luxembourg's property market." }}</p>
+        </div>
+      </div>
+
+      <div class="team-card">
+        <div class="team-photo-wrap">
+          <img src="{{ (.Params.secretary_image | default "images/team-secretary.svg") | strings.TrimPrefix "/" | absURL }}" alt="{{ .Params.secretary_name | default "Secretary" }}" class="team-photo">
+        </div>
+        <div class="team-info">
+          <h3 class="team-name">{{ .Params.secretary_name | default "Secretary" }}</h3>
+          <p class="team-role">Secretary</p>
+          <p class="team-bio">{{ .Params.secretary_bio | default "Managing client appointments, correspondence, and day-to-day operations to keep LuxeHome running smoothly for every client." }}</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+{{ end }}
