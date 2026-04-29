@@ -1,0 +1,24 @@
+{{ define "main" }}
+
+<section class="page-hero page-hero-sm">
+  <div class="container">
+    <h1 class="page-title" style="color:#fff;">&#10003; Payment Successful</h1>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="success-page">
+      <div class="success-icon">&#127968;</div>
+      <h2>Your booking is confirmed!</h2>
+      <p>Thank you for choosing <strong>LuxeHome Real Estate</strong>. Your payment has been processed successfully.</p>
+      <p>A confirmation email will be sent to you shortly with your booking details and rental agreement copy.</p>
+      <div class="success-actions">
+        <a href="{{ "/properties/" | relURL }}" class="btn btn-primary btn-lg">Browse More Properties</a>
+        <a href="{{ "/" | relURL }}" class="btn btn-outline">Back to Home</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+{{ end }}
