@@ -1,0 +1,113 @@
+{{ define "main" }}
+
+<section class="hero">
+  <div class="hero-overlay"></div>
+  <div class="container hero-content">
+    <p class="hero-eyebrow">Luxembourg Real Estate</p>
+    <h1 class="hero-title">Find Your Perfect<br>Home in Luxembourg</h1>
+    <p class="hero-sub">Discover handpicked apartments, villas, and penthouses across the Grand Duchy's finest neighbourhoods.</p>
+    <div class="hero-actions">
+      <a href="{{ "properties/" | absURL }}" class="btn btn-primary">Browse Properties</a>
+      <a href="{{ "contact/" | absURL }}" class="btn btn-outline">Get in Touch</a>
+    </div>
+  </div>
+  <div class="hero-stats">
+    <div class="container hero-stats-inner">
+      <div class="stat">
+        <span class="stat-number">4+</span>
+        <span class="stat-label">Properties</span>
+      </div>
+      <div class="stat">
+        <span class="stat-number">10+</span>
+        <span class="stat-label">Years Experience</span>
+      </div>
+      <div class="stat">
+        <span class="stat-number">100%</span>
+        <span class="stat-label">Client Satisfaction</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section featured">
+  <div class="container">
+    <div class="section-header">
+      <p class="section-eyebrow">Hand-picked for you</p>
+      <h2 class="section-title">Featured Properties</h2>
+    </div>
+
+    <div class="property-grid">
+      {{ range where (where .Site.RegularPages "Section" "properties") ".Params.featured" true }}
+      <div class="property-card">
+        <div class="card-image">
+          {{ if .Params.image }}
+          <img src="{{ .Params.image | strings.TrimPrefix "/" | absURL }}" alt="{{ .Title }}">
+          {{ else }}
+          <div class="card-image-placeholder">
+            <span>&#127968;</span>
+          </div>
+          {{ end }}
+          <span class="card-badge {{ if eq .Params.status "For Rent" }}badge-rent{{ else }}badge-sale{{ end }}">{{ .Params.status }}</span>
+        </div>
+        <div class="card-body">
+          <div class="card-type">{{ .Params.type }}</div>
+          <h3 class="card-title">{{ .Title }}</h3>
+          <p class="card-location">&#128205; {{ .Params.location }}</p>
+          <p class="card-desc">{{ .Params.description | truncate 100 }}</p>
+          <div class="card-meta">
+            {{ if .Params.bedrooms }}<span>&#127978; {{ .Params.bedrooms }} bed</span>{{ end }}
+            {{ if .Params.bathrooms }}<span>&#128716; {{ .Params.bathrooms }} bath</span>{{ end }}
+            {{ if .Params.area }}<span>&#9632; {{ .Params.area }}m²</span>{{ end }}
+          </div>
+          <div class="card-footer">
+            <span class="card-price">{{ .Params.price }}</span>
+            <a href="{{ .RelPermalink }}" class="btn btn-sm btn-primary">View Details</a>
+          </div>
+        </div>
+      </div>
+      {{ end }}
+    </div>
+
+    <div class="section-cta">
+      <a href="{{ "properties/" | absURL }}" class="btn btn-outline">View All Properties</a>
+    </div>
+  </div>
+</section>
+
+<section class="section services">
+  <div class="container">
+    <div class="section-header">
+      <p class="section-eyebrow">What we offer</p>
+      <h2 class="section-title">Our Services</h2>
+    </div>
+    <div class="services-grid">
+      <div class="service-card">
+        <div class="service-icon">&#127968;</div>
+        <h3>Buy Property</h3>
+        <p>Browse our curated selection of apartments, villas, and penthouses across Luxembourg's finest locations.</p>
+      </div>
+      <div class="service-card">
+        <div class="service-icon">&#128273;</div>
+        <h3>Rent Property</h3>
+        <p>Find the perfect rental home to suit your lifestyle and budget, with flexible lease terms.</p>
+      </div>
+      <div class="service-card">
+        <div class="service-icon">&#128200;</div>
+        <h3>Market Advice</h3>
+        <p>Get expert guidance on Luxembourg's property market from our experienced agents.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section cta-section">
+  <div class="container">
+    <div class="cta-box">
+      <h2>Ready to Find Your Dream Home?</h2>
+      <p>Our team is here to help you every step of the way.</p>
+      <a href="{{ "contact/" | absURL }}" class="btn btn-primary btn-lg">Contact Us Today</a>
+    </div>
+  </div>
+</section>
+
+{{ end }}
