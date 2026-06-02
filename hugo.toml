@@ -1,6 +1,6 @@
 baseURL = "https://ghebre-awet-unilu.github.io/luxehome/"
 languageCode = "en-us"
-title = "LuxeHome Real Estate"
+title = "LuxeHome"
 
 [params]
   description = "Find your dream property in Luxembourg — sales and rentals"
