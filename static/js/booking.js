@@ -1,248 +1,170 @@
-// LuxeHome — Booking Flow (JAMstack, no backend)
+/*
+ * Property booking: guest enters name + email, the API creates a PayPal order
+ * (price taken from the database) and we redirect to PayPal.
+ * Also renders the database-driven detail page /property/?id=123.
+ */
 (function () {
   'use strict';
 
-  var flowEl = document.getElementById('bookingFlow');
-  if (!flowEl) return;
+  var api = window.LuxeAPI;
+  if (!api) return;
 
-
-
-  var propertyTitle  = flowEl.dataset.title  || 'LuxeHome Property';
-  var priceRaw       = flowEl.dataset.price  || '';
-  var propertyStatus = flowEl.dataset.status || '';
-
-
-
-  var priceMatch = priceRaw.replace(/,/g, '').match(/[\d]+(\.\d+)?/);
-  var basePrice  = priceMatch ? parseFloat(priceMatch[0]) : 0;
-  var vatRate    = 0.15;
-  var vatAmount  = Math.round(basePrice * vatRate * 100) / 100;
-  var totalPrice = Math.round((basePrice + vatAmount) * 100) / 100;
-
-  function fmt(n) {
-    return '€' + n.toLocaleString('en-IE', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  function parsePrice(price) {
+    var m = String(price || '').replace(/,/g, '').match(/\d+(\.\d+)?/);
+    return m ? parseFloat(m[0]) : 0;
   }
 
-  
+  function euro(n) {
+    return '€' + Number(n).toLocaleString('en-IE', { maximumFractionDigits: 2 });
+  }
 
-  var stepBooking   = document.getElementById('stepBooking');
-  var stepCheckout  = document.getElementById('stepCheckout');
-  var stepAgreement = document.getElementById('stepAgreement');
-  var paypalWrap    = document.getElementById('paypalButtonContainer');
+  // Must match bookingAmount() in booking_api/server.js
+  function amountInfo(box) {
+    var price = box.dataset.price || '';
+    var isRent = box.dataset.status === 'For Rent' || /month/i.test(price);
+    if (isRent) {
+      return { label: 'First month’s rent', amount: parsePrice(price) };
+    }
+    return { label: 'Reservation deposit', amount: Number(box.dataset.deposit) || 0 };
+  }
 
-  
+  function initBookingBox(box) {
+    var bookBtn  = document.getElementById('bookPropertyBtn');
+    var form     = document.getElementById('bookingForm');
+    var cancel   = document.getElementById('bookingCancel');
+    var submit   = document.getElementById('bookingSubmit');
+    var errorEl  = document.getElementById('bookingError');
+    if (!bookBtn || !form) return;
 
-  var elBase  = document.getElementById('summaryBase');
-  var elVat   = document.getElementById('summaryVat');
-  var elTotal = document.getElementById('summaryTotal');
-  var elPayBtn = document.getElementById('payBtn');
+    function showError(text) {
+      errorEl.textContent = text;
+      errorEl.hidden = false;
+    }
 
-  if (elBase)  elBase.textContent  = fmt(basePrice);
-  if (elVat)   elVat.textContent   = fmt(vatAmount)  + ' (15%)';
-  if (elTotal) elTotal.textContent = fmt(totalPrice);
-  if (elPayBtn) elPayBtn.textContent = 'Pay ' + fmt(totalPrice);
+    bookBtn.addEventListener('click', function () {
+      var info = amountInfo(box);
+      if (!info.amount) {
+        alert('This property has no valid price. Please contact us instead.');
+        return;
+      }
+      document.getElementById('bookingAmountLabel').textContent = info.label;
+      document.getElementById('bookingAmount').textContent = euro(info.amount);
+      errorEl.hidden = true;
+      bookBtn.hidden = true;
+      form.hidden = false;
+      document.getElementById('bookingName').focus();
+    });
 
-  
+    cancel.addEventListener('click', function () {
+      form.hidden = true;
+      bookBtn.hidden = false;
+    });
 
-  var bookingForm = document.getElementById('bookingForm');
-  if (bookingForm) {
-    bookingForm.addEventListener('submit', function (e) {
+    form.addEventListener('submit', function (e) {
       e.preventDefault();
+      errorEl.hidden = true;
 
-      
-
-      var inputs = bookingForm.querySelectorAll('[required]');
-      var valid  = true;
-      inputs.forEach(function (inp) {
-        if (!inp.value.trim()) {
-          inp.classList.add('field-error');
-          valid = false;
-        } else {
-          inp.classList.remove('field-error');
-        }
-      });
-      if (!valid) {
-        bookingForm.querySelector('.booking-error').style.display = 'block';
-        return;
+      var name  = document.getElementById('bookingName').value.trim();
+      var email = document.getElementById('bookingEmail').value.trim();
+      if (!name) return showError('Please enter your name.');
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return showError('Please enter a valid email address.');
       }
-      bookingForm.querySelector('.booking-error').style.display = 'none';
 
-      stepBooking.style.display  = 'none';
-      stepCheckout.style.display = 'block';
-      stepCheckout.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
+      submit.disabled = true;
+      submit.textContent = 'Starting payment…';
 
-    
+      var body = { guest_name: name, guest_email: email };
+      if (box.dataset.propertyId) body.property_id = box.dataset.propertyId;
+      else body.property_title = box.dataset.propertyTitle;
 
-    bookingForm.querySelectorAll('input, select, textarea').forEach(function (inp) {
-      inp.addEventListener('input', function () { inp.classList.remove('field-error'); });
-    });
-  }
-
-  
-  
-  var payBtn = document.getElementById('payBtn');
-  if (payBtn) {
-    payBtn.addEventListener('click', function () {
-      stepCheckout.style.display  = 'none';
-      stepAgreement.style.display = 'block';
-      stepAgreement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      initSignature();
+      api.request('/api/paypal/create-order', { method: 'POST', body: body })
+        .then(function (data) {
+          window.location.href = data.approveUrl;
+        })
+        .catch(function (err) {
+          showError(err.message);
+          submit.disabled = false;
+          submit.textContent = 'Continue to PayPal';
+        });
     });
   }
 
-  
+  // ---------- /property/?id=123 ----------
 
-  var sigCanvas, sigCtx, drawing = false;
+  function renderDetail(p) {
+    var esc = api.escapeHtml;
+    document.title = p.title + ' | LuxeHome Real Estate';
+    document.getElementById('pdCrumb').textContent = p.title;
+    document.getElementById('pdTitle').textContent = p.title;
+    document.getElementById('pdType').textContent = p.type || '';
+    document.getElementById('pdLocation').textContent = p.location ? '📍 ' + p.location : '';
+    document.getElementById('pdPrice').textContent = p.price || '';
 
-  function initSignature() {
-    sigCanvas = document.getElementById('sigCanvas');
-    if (!sigCanvas || sigCanvas._init) return;
-    sigCanvas._init = true;
-    sigCtx = sigCanvas.getContext('2d');
-    sigCtx.strokeStyle = '#1a3c5e';
-    sigCtx.lineWidth   = 2.5;
-    sigCtx.lineCap     = 'round';
+    var badge = document.getElementById('pdBadge');
+    badge.textContent = p.status || '';
+    badge.className = 'card-badge ' + (p.status === 'For Rent' ? 'badge-rent' : 'badge-sale');
 
-    function getPos(e) {
-      var r = sigCanvas.getBoundingClientRect();
-      var src = e.touches ? e.touches[0] : e;
-      return { x: src.clientX - r.left, y: src.clientY - r.top };
+    var img = api.imageUrl(p.image_path);
+    document.getElementById('pdImage').innerHTML = img
+      ? '<img src="' + esc(img) + '" alt="' + esc(p.title) + '">'
+      : '<div class="detail-image-placeholder"><p>' + esc(p.title) + '</p></div>';
+
+    var specs = '';
+    if (p.bedrooms) specs += '<div class="spec-item"><span class="spec-icon">&#127978;</span><span class="spec-val">' + esc(p.bedrooms) + '</span><span class="spec-lbl">Bedrooms</span></div>';
+    if (p.bathrooms) specs += '<div class="spec-item"><span class="spec-icon">&#128716;</span><span class="spec-val">' + esc(p.bathrooms) + '</span><span class="spec-lbl">Bathrooms</span></div>';
+    if (p.area) specs += '<div class="spec-item"><span class="spec-icon">&#9632;</span><span class="spec-val">' + esc(p.area) + 'm²</span><span class="spec-lbl">Floor Area</span></div>';
+    document.getElementById('pdSpecs').innerHTML = specs;
+
+    var body = String(p.description || '')
+      .split(/\n{2,}/)
+      .filter(Boolean)
+      .map(function (para) { return '<p>' + esc(para) + '</p>'; })
+      .join('');
+    body += videoHtml(p.video_url);
+    document.getElementById('pdBody').innerHTML = body;
+
+    var box = document.getElementById('bookingBox');
+    box.dataset.propertyId = p.id;
+    box.dataset.propertyTitle = p.title;
+    box.dataset.price = p.price || '';
+    box.dataset.status = p.status || '';
+  }
+
+  function videoHtml(url) {
+    url = String(url || '').trim();
+    if (!/^https?:\/\//i.test(url)) return '';
+    var yt = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([\w-]{6,})/);
+    if (yt) {
+      return '<div class="pd-video"><iframe src="https://www.youtube.com/embed/' + yt[1] +
+        '" title="Property video" allowfullscreen loading="lazy"></iframe></div>';
     }
-
-    sigCanvas.addEventListener('mousedown',  function (e) { drawing = true; var p = getPos(e); sigCtx.beginPath(); sigCtx.moveTo(p.x, p.y); });
-    sigCanvas.addEventListener('mousemove',  function (e) { if (!drawing) return; var p = getPos(e); sigCtx.lineTo(p.x, p.y); sigCtx.stroke(); });
-    sigCanvas.addEventListener('mouseup',    function ()  { drawing = false; });
-    sigCanvas.addEventListener('mouseleave', function ()  { drawing = false; });
-    sigCanvas.addEventListener('touchstart', function (e) { e.preventDefault(); drawing = true; var p = getPos(e); sigCtx.beginPath(); sigCtx.moveTo(p.x, p.y); }, { passive: false });
-    sigCanvas.addEventListener('touchmove',  function (e) { e.preventDefault(); if (!drawing) return; var p = getPos(e); sigCtx.lineTo(p.x, p.y); sigCtx.stroke(); }, { passive: false });
-    sigCanvas.addEventListener('touchend',   function ()  { drawing = false; });
+    return '<div class="pd-video"><video src="' + api.escapeHtml(url) + '" controls preload="metadata"></video></div>';
   }
 
-  
+  var detail = document.getElementById('propertyDetail');
+  var box = document.getElementById('bookingBox');
 
-  window.toggleSigMode = function (mode) {
-    var drawWrap = document.getElementById('sigDrawWrap');
-    var typeWrap = document.getElementById('sigTypeWrap');
-    var btnDraw  = document.getElementById('sigBtnDraw');
-    var btnType  = document.getElementById('sigBtnType');
-    if (mode === 'draw') {
-      drawWrap.style.display = 'block';
-      typeWrap.style.display = 'none';
-      btnDraw.classList.add('sig-mode-active');
-      btnType.classList.remove('sig-mode-active');
-      initSignature();
+  if (detail) {
+    var statusEl = document.getElementById('pdStatus');
+    var id = new URLSearchParams(window.location.search).get('id');
+
+    if (!id) {
+      statusEl.textContent = 'No property selected.';
     } else {
-      drawWrap.style.display = 'none';
-      typeWrap.style.display = 'block';
-      btnType.classList.add('sig-mode-active');
-      btnDraw.classList.remove('sig-mode-active');
-    }
-  };
-
-  window.clearSignature = function () {
-    if (sigCanvas && sigCtx) sigCtx.clearRect(0, 0, sigCanvas.width, sigCanvas.height);
-  };
-
-  
-
-  var completePayBtn = document.getElementById('completePayBtn');
-  if (completePayBtn) {
-    completePayBtn.addEventListener('click', function () {
-      var agreeCheck = document.getElementById('agreeCheck');
-      var agreeErr   = document.getElementById('agreeError');
-
-    
-
-      if (!agreeCheck.checked) {
-        agreeErr.style.display = 'block';
-        return;
-      }
-      agreeErr.style.display = 'none';
-
-      
-
-      var sigMode  = document.querySelector('.sig-mode-active');
-      var sigValid = false;
-      if (sigMode && sigMode.id === 'sigBtnType') {
-        var typed = document.getElementById('sigTyped');
-        sigValid  = typed && typed.value.trim().length > 1;
-      } else {
-        
-
-        if (sigCanvas) {
-          var data = sigCtx.getImageData(0, 0, sigCanvas.width, sigCanvas.height).data;
-          for (var i = 3; i < data.length; i += 4) { if (data[i] > 0) { sigValid = true; break; } }
-        }
-      }
-      var sigErr = document.getElementById('sigError');
-      if (!sigValid) {
-        sigErr.style.display = 'block';
-        return;
-      }
-      sigErr.style.display = 'none';
-
-      
-
-      var selectedMethod = document.querySelector('input[name="payMethod"]:checked');
-      var method = selectedMethod ? selectedMethod.value : 'paypal';
-
-      stepAgreement.style.display   = 'none';
-      paypalWrap.style.display      = 'block';
-      paypalWrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-      renderPayPal(method);
-    });
-  }
-
-  
-  
-  var paypalRendered = false;
-  function renderPayPal(method) {
-    if (paypalRendered) return;
-    paypalRendered = true;
-
-    var container = document.getElementById('paypalButtonContainer');
-
-    if (typeof paypal === 'undefined') {
-      container.innerHTML = '<p class="paypal-error">PayPal SDK failed to load. Please refresh and try again.</p>';
-      return;
-    }
-
-    paypal.Buttons({
-      style: {
-        layout: 'vertical',
-        color:  'blue',
-        shape:  'rect',
-        label:  'pay'
-      },
-      createOrder: function (data, actions) {
-        return actions.order.create({
-          purchase_units: [{
-            description: propertyTitle,
-            amount: {
-              value:         totalPrice.toFixed(2),
-              currency_code: 'EUR'
-            }
-          }]
+      api.request('/api/properties/' + encodeURIComponent(id))
+        .then(function (data) {
+          renderDetail(data.property);
+          statusEl.hidden = true;
+          detail.hidden = false;
+          initBookingBox(box);
+        })
+        .catch(function (err) {
+          statusEl.textContent = err.message;
+          document.getElementById('pdCrumb').textContent = 'Not found';
         });
-      },
-      onApprove: function (data, actions) {
-        return actions.order.capture().then(function (details) {
-          alert('Payment successful! Thank you, ' + (details.payer && details.payer.name ? details.payer.name.given_name : 'valued customer') + '. Your booking is confirmed.');
-          const successUrl = document.getElementById('bookingFlow').dataset.successUrl || '/success/';
-          window.location.href = successUrl;
-        });
-      },
-      onError: function () {
-        alert('Payment could not be completed. Please try again or contact us at info@luxehome.lu.');
-      },
-      onCancel: function () {
-        paypalWrap.style.display      = 'none';
-        stepAgreement.style.display   = 'block';
-        stepAgreement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    }).render('#paypalButtonContainer');
+    }
+  } else if (box) {
+    initBookingBox(box);
   }
-
 })();

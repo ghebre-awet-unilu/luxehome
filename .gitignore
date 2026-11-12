@@ -42,3 +42,8 @@ Thumbs.db
 .cursor/rules/nx-rules.mdc
 .github/instructions/nx.instructions.md
 
+
+# Hugo build output
+/public/
+/resources/
+.hugo_build.lock

@@ -5,6 +5,11 @@ title = "LuxeHome Real Estate"
 [params]
   description = "Find your dream property in Luxembourg — sales and rentals"
   author = "LuxeHome"
+  # Address of booking_api. Change this when the API is deployed online
+  # (must be https:// if the website itself is served over https).
+  apiBase = "http://localhost:3000"
+  # Shown to visitors before paying. Keep equal to SALE_DEPOSIT_EUR in booking_api/.env
+  saleDeposit = 1000
 
 [menu]
 

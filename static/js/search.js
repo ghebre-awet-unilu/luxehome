@@ -1,17 +1,42 @@
 
+/* ---------- Contact form ---------- */
+
 window.handleFormSubmit = function (e) {
   e.preventDefault();
   var form    = e.target;
   var success = document.getElementById('formSuccess');
+  var error   = document.getElementById('formError');
   var btn     = form.querySelector('button[type="submit"]');
   if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
-  setTimeout(function () {
-    form.reset();
-    if (btn)     { btn.style.display = 'none'; }
-    if (success) { success.style.display = 'block'; }
-  }, 800);
+  if (error) { error.style.display = 'none'; }
+
+  window.LuxeAPI.request('/api/contact', {
+    method: 'POST',
+    body: {
+      firstName: form.firstName.value,
+      lastName:  form.lastName.value,
+      email:     form.email.value,
+      phone:     form.phone.value,
+      interest:  form.interest.value,
+      message:   form.message.value
+    }
+  })
+    .then(function () {
+      form.reset();
+      if (btn)     { btn.style.display = 'none'; }
+      if (success) { success.style.display = 'block'; }
+    })
+    .catch(function (err) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Send Message'; }
+      if (error) {
+        error.textContent = err.message;
+        error.style.display = 'block';
+      }
+    });
 };
 
+
+/* ---------- Properties page: live data + search/filter ---------- */
 
 (function () {
   'use strict';
@@ -61,6 +86,21 @@ window.handleFormSubmit = function (e) {
     }
   }
 
+  function rebuildTypeOptions(properties) {
+    if (!filterType) return;
+    var current = filterType.value;
+    var types = [];
+    properties.forEach(function (p) {
+      if (p.type && types.indexOf(p.type) === -1) types.push(p.type);
+    });
+    types.sort();
+    filterType.innerHTML = '<option value="">All Types</option>' + types.map(function (t) {
+      var safe = window.LuxeAPI.escapeHtml(t);
+      return '<option value="' + safe + '">' + safe + '</option>';
+    }).join('');
+    filterType.value = types.indexOf(current) !== -1 ? current : '';
+  }
+
   window.clearAllFilters = function () {
     if (searchInput)  searchInput.value  = '';
     if (filterType)   filterType.value   = '';
@@ -74,4 +114,34 @@ window.handleFormSubmit = function (e) {
   if (clearBtn)     clearBtn.addEventListener('click', window.clearAllFilters);
 
   filterProperties();
+
+  // Replace the static (build-time) cards with the latest data from the database.
+  // If the API is offline, the static cards stay on the page.
+  window.LuxeAPI.request('/api/properties')
+    .then(function (data) {
+      var list = data.properties || [];
+      grid.innerHTML = list.map(window.LuxeAPI.cardHtml).join('');
+      rebuildTypeOptions(list);
+      filterProperties();
+    })
+    .catch(function () { /* keep static listings */ });
+})();
+
+
+/* ---------- Home page: featured homes from the database ---------- */
+
+(function () {
+  'use strict';
+
+  var grid = document.getElementById('featuredGrid');
+  if (!grid) return;
+
+  window.LuxeAPI.request('/api/properties')
+    .then(function (data) {
+      var list = (data.properties || []).slice().sort(function (a, b) {
+        return (b.featured ? 1 : 0) - (a.featured ? 1 : 0);
+      });
+      if (list.length) grid.innerHTML = list.slice(0, 3).map(window.LuxeAPI.cardHtml).join('');
+    })
+    .catch(function () { /* keep static listings */ });
 })();
