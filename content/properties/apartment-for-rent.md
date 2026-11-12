@@ -10,7 +10,7 @@ status: "For Rent"
 featured: true
 image: "/images/apartment-for-rent.png"
 draft: false
-description: "Bright two-bedroom apartment in the heart of Kirchberg, Luxembourg's European quarter. Modern finishes, close to EU institutions and public transport."
+description: "Two-bedroom apartment in Kirchberg, Luxembourg's European quarter. Modern finishes, close to EU institutions and public transport."
 ---
 
 A stylish and well-lit two-bedroom apartment located in Kirchberg, one of Luxembourg's most sought-after neighbourhoods. Ideal for professionals working at the European institutions or the financial district.
